@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>jQuery UI</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="js/libs/jqueryui/css/jquery-ui.min.css"> 
+        <style>
+            .calendar {
+                border-collapse: collapse;
+            }
+            .calendar td {
+                border: 1px solid black;
+                width: 100px;
+                vertical-align: top;
+            }
+            .calendar tr.header {
+                text-align: center;
+            }
+            .calendar tr.row {
+                height: 100px;
+            }
+            .select {
+                background-color: pink;
+            }
+            .event {
+                font-size: smaller;
+                background-color: pink;
+                border: 1px solid black;
+            }
+            .event-connect-left {
+                border-left: 0;
+            }
+            .event-connect-right {
+                border-right: 0;
+            }
+        </style>
+    </head>
+    <body>
+
+        <table class="calendar">
+            <tr class="header">
+                <td>日</td>
+                <td>月</td>
+                <td>火</td>
+                <td>水</td>
+                <td>木</td>
+                <td>金</td>
+                <td>土</td>
+            </tr>
+            <tr class="row">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td data-date="1">1</td>
+                <td data-date="2">2</td>
+                <td data-date="3">3</td>
+                <td data-date="4">4</td>
+            </tr>
+            <tr class="row">
+                <td data-date="5">5</td>
+                <td data-date="6">6</td>
+                <td data-date="7">7</td>
+                <td data-date="8">8</td>
+                <td data-date="9">9</td>
+                <td data-date="10">10</td>
+                <td data-date="11">11</td>
+            </tr>
+            <tr class="row">
+                <td data-date="12">12</td>
+                <td data-date="13">13</td>
+                <td data-date="14">14</td>
+                <td data-date="15">15</td>
+                <td data-date="16">16</td>
+                <td data-date="17">17</td>
+                <td data-date="18">18</td>
+            </tr>
+            <tr class="row">
+                <td data-date="19">19</td>
+                <td data-date="20">20</td>
+                <td data-date="21">21</td>
+                <td data-date="22">22</td>
+                <td data-date="23">23</td>
+                <td data-date="24">24</td>
+                <td data-date="25">25</td>
+            </tr>
+            <tr class="row">
+                <td data-date="26">26</td>
+                <td data-date="27">27</td>
+                <td data-date="28">28</td>
+                <td data-date="29">29</td>
+                <td data-date="30">30</td>
+                <td data-date="31">31</td>
+                <td></td>
+            </tr>
+        </table>
+
+        <div id="log" style="border: 1px solid gray">
+        </div>
+
+        <form>
+            件名:<input id="eventTitle" name="eventTitle" value="new_event">
+            開始日:<input id="startDate" name="startDate" value="1">
+            終了日:<input id="endDate" name="endDate" value="5">
+            <input id="createSchedule" type="button" value="スケジュール追加">
+        </form>
+
+        <script src="js/libs/jquery/jquery.min.js"></script>
+        <script src="js/libs/jqueryui/jquery-ui.min.js"></script>
+        <script>
+
+            var start = undefined;
+            var end = undefined;
+            var digitPattern = /\d+/;
+            var dayCells;
+            var eventId = 1;
+
+            function setEventsDraggable() {
+
+                $(".eventHead").draggable({
+                    drag: function() {
+                        removeEventLabelExceptHead($(this).data("eventId"));
+                        var pos = getCenter($(this));
+                        var closestDayCell = getClosestDayCell(pos[0], pos[1]);
+                        var d = $(closestDayCell).data("date");
+                        var diff = $(this).data("eventEnd") - $(this).data("eventStart");
+                        highlight(d, d + diff);
+                    },
+                    stop: function() {
+                        var pos = getCenter($(this));
+                        var closestDayCell = getClosestDayCell(pos[0], pos[1]);
+                        var d = $(closestDayCell).data("date");
+                        var diff = $(this).data("eventEnd") - $(this).data("eventStart");
+                        addEventLabel($(this).data("eventTitle"), d, d + diff);
+                        removeEventLabel($(this).data("eventId"));
+                    }
+                });
+            }
+            
+            function getCenter(elem) {
+                var left = elem.position().left + elem.width() / 2;
+                var top = elem.position().top + elem.height() / 2;
+                return [left, top];
+            }
+            
+            function getClosestDayCell(x, y) {
+                var minDistance = false;
+                var closest;
+                dayCells.each(function() {
+                    var pos = getCenter($(this));
+                    var left = pos[0];
+                    var top = pos[1];
+                    var w = x - left;
+                    var h = y - top;
+                    var distance = Math.sqrt(w * w + h * h);
+                    
+                    if (!minDistance) {
+                        minDistance = distance;
+                        closest = $(this);
+                    } else {
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closest = $(this);
+                        }
+                    }
+                });
+                return closest;
+            }
+
+            $("#createSchedule").click(function() {
+                if ($("#eventTitle").val() === "") {
+                    alert("件名を入力してください");
+                    return;
+                }
+                if ($("#startDate").val() === "") {
+                    alert("開始日を入力してください");
+                    return;
+                }
+                if ($("#endDate").val() === "") {
+                    alert("終了日を入力してください");
+                    return;
+                }
+                var title = $("#eventTitle").val();
+                var s = parseInt($("#startDate").val());
+                var e = parseInt($("#endDate").val());
+                
+                addEventLabel(title, s, e);
+            });
+            
+            function addEventLabel(title, s, e) {
+                dayCells.each(function() {
+                    $(this).removeClass("select");
+                    var day = parseInt($(this).data("date"));
+                    if (day >= s && day <= e) {
+                        var eventDiv = $("<div/>").addClass("event");
+                        if (day < e) {
+                            eventDiv.addClass("event-connect-right");
+                        }
+                        if (day > s) {
+                            eventDiv.addClass("event-connect-left");
+                        }
+                        if (day === s) {
+                            eventDiv.text(title);
+                            // head
+                            eventDiv.addClass("eventHead");
+                            eventDiv.data("eventHead", "yes");
+                            eventDiv.data("eventStart", s);
+                            eventDiv.data("eventEnd", e);
+                            eventDiv.data("eventTitle", title);
+                        } else {
+                            eventDiv.html("&nbsp;");
+                        }
+                        eventDiv.data("eventId", eventId);
+                        $(this).append(eventDiv);
+                        
+                        setEventsDraggable();
+                    }
+                });
+                eventId++;
+            }
+            
+            function removeEventLabelExceptHead(eid) {
+                $(".event").each(function() {
+                    if ($(this).data("eventId") == eid && $(this).data("eventHead") != "yes") {
+                        $(this).remove();
+                    }
+                });
+            }
+            function removeEventLabel(eid) {
+                $(".event").each(function() {
+                    if ($(this).data("eventId") == eid) {
+                        $(this).remove();
+                    }
+                });
+            }
+
+            function updateSelection() {
+                if (digitPattern.test(start) && digitPattern.test(end)) {
+                    var s = parseInt(start);
+                    var e = parseInt(end);
+                    if (s > e) {
+                        var t = s;
+                        s = e;
+                        e = t;
+                    }
+                    highlight(s, e);
+                    setForm(s, e);
+                }
+            }
+            
+            function setForm(s, e) {
+                $("#startDate").val(s);
+                $("#endDate").val(e);
+            }
+            
+            function highlight(s, e) {
+                dayCells.each(function() {
+                    var day = $(this).data("date");
+                    if (day >= s && day <= e) {
+                        $(this).addClass("select");
+                    } else {
+                        $(this).removeClass("select");
+                    }
+                });
+            }
+            
+            $(function() {
+                dayCells = $(".calendar tr.row td");
+                dayCells.on("mousedown", function(event) {
+                    start = $(this).data("date");
+                    updateSelection();
+                    event.preventDefault();
+                });
+                dayCells.on("mousemove", function() {
+                    end = $(this).data("date");
+                    updateSelection();
+                });
+                dayCells.on("mouseup", function() {
+                    updateSelection();
+                    start = end = undefined;
+                });
+            });
+
+        </script>
+    </body>
+</html>
